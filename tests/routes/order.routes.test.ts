@@ -161,4 +161,115 @@ describe('order routes', () => {
       },
     });
   });
+
+  it('bulk creates orders with per-order results', async () => {
+    const response = await request(app)
+      .post('/api/v1/orders/bulk')
+      .send({
+        orders: [
+          {
+            order_id: 'ORD-1001',
+            courier_partner: 'mock_courier',
+          },
+          {
+            order_id: 'ORD-1002',
+            courier_partner: 'mock_courier',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        total: 2,
+        success: 2,
+        failed: 0,
+        results: [
+          {
+            order_id: 'ORD-1001',
+            success: true,
+            data: {
+              courier_partner: 'mock_courier',
+              courier_order_id: 'MOCK-SHIP-ORD1001',
+              awb_number: 'MOCK-AWB-ORD1001',
+              status: 'CREATED',
+            },
+          },
+          {
+            order_id: 'ORD-1002',
+            success: true,
+            data: {
+              courier_partner: 'mock_courier',
+              courier_order_id: 'MOCK-SHIP-ORD1002',
+              awb_number: 'MOCK-AWB-ORD1002',
+              status: 'CREATED',
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('bulk creates with partial failures', async () => {
+    const response = await request(app)
+      .post('/api/v1/orders/bulk')
+      .send({
+        orders: [
+          {
+            order_id: 'ORD-1001',
+            courier_partner: 'mock_courier',
+          },
+          {
+            order_id: 'ORD-1002',
+            courier_partner: 'delhivery',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        total: 2,
+        success: 1,
+        failed: 1,
+        results: [
+          {
+            order_id: 'ORD-1001',
+            success: true,
+          },
+          {
+            order_id: 'ORD-1002',
+            success: false,
+            error: {
+              code: 'UNKNOWN_COURIER',
+              message: 'Unsupported courier partner: delhivery',
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('rejects invalid bulk payloads', async () => {
+    const response = await request(app).post('/api/v1/orders/bulk').send({
+      orders: [],
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: [
+          {
+            field: 'orders',
+            message: 'orders must contain at least 1 order',
+          },
+        ],
+      },
+    });
+  });
 });
