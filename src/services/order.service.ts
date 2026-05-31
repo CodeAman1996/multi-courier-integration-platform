@@ -13,6 +13,16 @@ export class DuplicateOrderError extends Error {
   }
 }
 
+export class OrderNotFoundError extends Error {
+  readonly statusCode = 404;
+  readonly code = 'ORDER_NOT_FOUND';
+
+  constructor(orderId: string) {
+    super(`Order not found: ${orderId}`);
+    this.name = 'OrderNotFoundError';
+  }
+}
+
 export class OrderService {
   constructor(private readonly repository: OrderRepository) {}
 
@@ -30,6 +40,28 @@ export class OrderService {
       payload,
       shipment,
     });
+  }
+
+  async trackOrder(orderId: string) {
+    const order = await this.repository.findByOrderId(orderId);
+
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    const courier = courierRegistry.get(order.courier_partner);
+    const tracking = await courier.trackShipment({
+      orderId: order.order_id,
+      awbNumber: order.awb_number,
+    });
+
+    return {
+      order_id: order.order_id,
+      courier_partner: order.courier_partner,
+      awb_number: order.awb_number,
+      status: tracking.status,
+      history: tracking.history,
+    };
   }
 }
 

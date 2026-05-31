@@ -1,7 +1,8 @@
 import { Router } from 'express';
 
-import { createOrder } from '../controllers/order.controller.js';
+import { createOrder, trackOrder } from '../controllers/order.controller.js';
 
 export const orderRouter = Router();
 
 orderRouter.post('/', createOrder);
+orderRouter.get('/:orderId/track', trackOrder);

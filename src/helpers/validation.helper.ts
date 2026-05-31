@@ -52,6 +52,13 @@ const createOrderSchema = Joi.object({
   collectable_value: Joi.number().min(0).optional(),
 }).unknown(true);
 
+const orderIdParamSchema = Joi.object({
+  orderId: Joi.string().trim().required().messages({
+    'any.required': 'orderId is required',
+    'string.empty': 'orderId is required',
+  }),
+});
+
 export function validateEnv(source: NodeJS.ProcessEnv) {
   const { value, error } = envSchema.validate(source, {
     abortEarly: false,
@@ -117,6 +124,10 @@ export type CreateOrderRequest = {
 
 export function validateCreateOrder(payload: unknown) {
   return validatePayload<CreateOrderRequest>(createOrderSchema, payload);
+}
+
+export function validateOrderIdParam(payload: unknown) {
+  return validatePayload<{ orderId: string }>(orderIdParamSchema, payload);
 }
 
 function formatJoiErrors(error: Joi.ValidationError): FieldValidationError[] {
