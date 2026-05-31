@@ -21,9 +21,9 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - Prisma
 - Redis
 - BullMQ
-- Zod
+- Joi
 - Axios
-- Pino
+- Winston
 - Vitest
 
 ## High-Level Architecture
@@ -34,10 +34,6 @@ Client / OMS / Frontend
         v
 Express Routes
         |
-        v
-Validation Middleware
-        |
-        v
 Controllers
         |
         v
@@ -67,7 +63,9 @@ POST /api/v1/orders
 GET  /api/v1/orders/:orderId/track
 POST /api/v1/orders/:orderId/cancel
 POST /api/v1/orders/bulk
-GET  /api/v1/orders/bulk/:batchId
+GET  /api/v1/orders/:orderId/tracking-history
+GET  /api/v1/couriers
+GET  /api/v1/couriers/:courierPartner
 ```
 
 Every create-order request accepts a `courier_partner` field, for example:
@@ -86,9 +84,9 @@ The rest of the payload follows the platform's normalized internal schema. Consu
 
 ## Bulk Processing Approach
 
-Bulk order creation will use Redis and BullMQ instead of dedicated `BulkBatch` and `BulkBatchItem` database tables.
+Bulk order creation currently processes up to 100 orders with concurrent service calls and returns per-order results in the same response.
 
-PostgreSQL remains the permanent source of truth for orders and tracking history. Redis stores temporary batch progress and per-order results with a TTL.
+This keeps the assignment implementation simple while still avoiding sequential courier calls and supporting partial success. PostgreSQL remains the permanent source of truth for orders and tracking history. Redis/BullMQ can be introduced later without changing the consumer-facing request schema.
 
 ```txt
 POST /api/v1/orders/bulk
@@ -97,19 +95,13 @@ POST /api/v1/orders/bulk
 Validate up to 100 orders
         |
         v
-Create batch_id
+Process orders concurrently
         |
         v
-Store temporary batch metadata in Redis
-        |
-        v
-Enqueue each order in BullMQ
-        |
-        v
-Return batch_id immediately
+Return per-order success/failure results
 ```
 
-This keeps the API responsive while avoiding extra permanent tables for short-lived bulk status data.
+The system intentionally avoids permanent `BulkBatch` and `BulkBatchItem` tables. If async processing is added later, Redis can hold temporary batch status.
 
 ## Planned Folder Structure
 
@@ -125,22 +117,20 @@ src/
 
   routes/
     order.routes.ts
-    bulk-order.routes.ts
+    courier.routes.ts
     health.routes.ts
 
   controllers/
     order.controller.ts
-    bulk-order.controller.ts
+    courier.controller.ts
 
-  validators/
-    validate.ts
-    order.validator.ts
-    bulk-order.validator.ts
+  helpers/
+    validation.helper.ts
+    response.helper.ts
 
   services/
     order.service.ts
     tracking.service.ts
-    bulk-order.service.ts
 
   couriers/
     courier-adapter.ts
@@ -158,15 +148,6 @@ src/
     mock-courier/
       mock-courier.adapter.ts
 
-  jobs/
-    bulk-order.queue.ts
-    bulk-order.worker.ts
-    bulk-order.processor.ts
-
-  redis/
-    redis.client.ts
-    bulk-status.store.ts
-
   repositories/
     order.repository.ts
     tracking-history.repository.ts
@@ -175,14 +156,7 @@ src/
   prisma/
     client.ts
 
-  middlewares/
-    error.middleware.ts
-    request-id.middleware.ts
-    logger.middleware.ts
-
   utils/
-    app-error.ts
-    error-codes.ts
     retry.ts
     logger.ts
 ```
@@ -195,7 +169,7 @@ The initial PostgreSQL schema will focus on permanent business data:
 - `TrackingHistory`
 - `CourierToken`
 
-Bulk batch progress will be stored in Redis because it is temporary operational state.
+Bulk batch progress is returned directly in the response and is not stored permanently.
 
 ## Development Scripts
 
@@ -207,6 +181,36 @@ npm test
 npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:studio
+```
+
+## Example Requests
+
+```bash
+curl http://localhost:3000/api/v1/couriers
+```
+
+```bash
+curl -X POST http://localhost:3000/api/v1/orders \
+  -H "Content-Type: application/json" \
+  -d "{\"order_id\":\"ORD-1001\",\"courier_partner\":\"mock_courier\",\"payment_mode\":\"COD\"}"
+```
+
+```bash
+curl http://localhost:3000/api/v1/orders/ORD-1001/track
+```
+
+```bash
+curl http://localhost:3000/api/v1/orders/ORD-1001/tracking-history
+```
+
+```bash
+curl -X POST http://localhost:3000/api/v1/orders/ORD-1001/cancel
+```
+
+```bash
+curl -X POST http://localhost:3000/api/v1/orders/bulk \
+  -H "Content-Type: application/json" \
+  -d "{\"orders\":[{\"order_id\":\"ORD-1001\",\"courier_partner\":\"mock_courier\"},{\"order_id\":\"ORD-1002\",\"courier_partner\":\"mock_courier\"}]}"
 ```
 
 ## Design Pattern
