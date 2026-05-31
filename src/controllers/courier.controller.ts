@@ -7,8 +7,11 @@ import {
   RequestValidationError,
   validateCourierPartnerParam,
 } from '../helpers/validation.helper.js';
+import { logger } from '../utils/logger.js';
 
 export function listCouriers(_req: Request, res: Response) {
+  logger.info('Listing supported couriers');
+
   return successResponse(res, {
     supported_couriers: courierRegistry.listSupportedCouriers(),
   });
@@ -17,13 +20,18 @@ export function listCouriers(_req: Request, res: Response) {
 export function getCourier(req: Request, res: Response) {
   try {
     const { courierPartner } = validateCourierPartnerParam(req.params);
+    logger.info('Checking courier support', { courier_partner: courierPartner });
+
     const courier = courierRegistry.get(courierPartner);
+    logger.info('Courier is supported', { courier_partner: courier.partnerCode });
 
     return successResponse(res, {
       courier_partner: courier.partnerCode,
       supported: true,
     });
   } catch (error) {
+    logger.warn('Courier support check failed', { error });
+
     if (error instanceof RequestValidationError) {
       return errorResponse(res, {
         statusCode: error.statusCode,
