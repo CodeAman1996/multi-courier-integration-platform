@@ -5,15 +5,15 @@ import { logger } from './utils/logger.js';
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT }, 'HTTP server started');
+  logger.info('HTTP server started', { port: env.PORT });
 });
 
 function shutdown(signal: NodeJS.Signals) {
-  logger.info({ signal }, 'Shutting down HTTP server');
+  logger.info('Shutting down HTTP server', { signal });
 
   server.close((error) => {
     if (error) {
-      logger.error({ error }, 'Error while shutting down HTTP server');
+      logger.error('Error while shutting down HTTP server', { error });
       process.exit(1);
     }
 
