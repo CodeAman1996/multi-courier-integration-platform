@@ -52,6 +52,15 @@ const createOrderSchema = Joi.object({
   collectable_value: Joi.number().min(0).optional(),
 }).unknown(true);
 
+const bulkCreateOrdersSchema = Joi.object({
+  orders: Joi.array().items(createOrderSchema).min(1).max(100).required().messages({
+    'any.required': 'orders is required',
+    'array.base': 'orders must be an array',
+    'array.min': 'orders must contain at least 1 order',
+    'array.max': 'orders cannot contain more than 100 orders',
+  }),
+});
+
 const orderIdParamSchema = Joi.object({
   orderId: Joi.string().trim().required().messages({
     'any.required': 'orderId is required',
@@ -122,8 +131,16 @@ export type CreateOrderRequest = {
   collectable_value?: number;
 } & Record<string, unknown>;
 
+export type BulkCreateOrdersRequest = {
+  orders: CreateOrderRequest[];
+};
+
 export function validateCreateOrder(payload: unknown) {
   return validatePayload<CreateOrderRequest>(createOrderSchema, payload);
+}
+
+export function validateBulkCreateOrders(payload: unknown) {
+  return validatePayload<BulkCreateOrdersRequest>(bulkCreateOrdersSchema, payload);
 }
 
 export function validateOrderIdParam(payload: unknown) {

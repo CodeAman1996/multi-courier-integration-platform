@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RequestValidationError,
+  validateBulkCreateOrders,
   validateCourierPartner,
   validatePayload,
 } from '../../src/helpers/validation.helper.js';
@@ -56,5 +57,36 @@ describe('validation helper', () => {
     expect(() => validateCourierPartner('delhivery', ['urbanebolt'])).toThrow(
       RequestValidationError,
     );
+  });
+
+  it('validates a bulk create order payload', () => {
+    const payload = validateBulkCreateOrders({
+      orders: [
+        {
+          order_id: 'ORD-1',
+          courier_partner: 'MOCK_COURIER',
+        },
+      ],
+    });
+
+    expect(payload).toEqual({
+      orders: [
+        {
+          order_id: 'ORD-1',
+          courier_partner: 'mock_courier',
+        },
+      ],
+    });
+  });
+
+  it('rejects bulk payloads over 100 orders', () => {
+    expect(() =>
+      validateBulkCreateOrders({
+        orders: Array.from({ length: 101 }, (_, index) => ({
+          order_id: `ORD-${index}`,
+          courier_partner: 'mock_courier',
+        })),
+      }),
+    ).toThrow(RequestValidationError);
   });
 });

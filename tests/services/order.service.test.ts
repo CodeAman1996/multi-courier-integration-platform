@@ -84,4 +84,55 @@ describe('OrderService', () => {
   it('throws not found when cancelling an unknown order', async () => {
     await expect(orderService.cancelOrder('UNKNOWN')).rejects.toBeInstanceOf(OrderNotFoundError);
   });
+
+  it('bulk creates orders and returns a summary', async () => {
+    const result = await orderService.bulkCreateOrders({
+      orders: [
+        {
+          order_id: 'ORD-1001',
+          courier_partner: 'mock_courier',
+        },
+        {
+          order_id: 'ORD-1002',
+          courier_partner: 'mock_courier',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      total: 2,
+      success: 2,
+      failed: 0,
+    });
+    expect(result.results).toHaveLength(2);
+  });
+
+  it('handles duplicate order ids inside a bulk payload', async () => {
+    const result = await orderService.bulkCreateOrders({
+      orders: [
+        {
+          order_id: 'ORD-1001',
+          courier_partner: 'mock_courier',
+        },
+        {
+          order_id: 'ORD-1001',
+          courier_partner: 'mock_courier',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      total: 2,
+      success: 1,
+      failed: 1,
+    });
+    expect(result.results[1]).toEqual({
+      order_id: 'ORD-1001',
+      success: false,
+      error: {
+        code: 'DUPLICATE_ORDER_IN_BATCH',
+        message: 'Duplicate order in batch: ORD-1001',
+      },
+    });
+  });
 });
