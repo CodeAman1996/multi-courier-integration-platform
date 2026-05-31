@@ -93,4 +93,38 @@ describe('order routes', () => {
       },
     });
   });
+
+  it('tracks an existing order shipment', async () => {
+    await request(app).post('/api/v1/orders').send({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+
+    const response = await request(app).get('/api/v1/orders/ORD-1001/track');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        order_id: 'ORD-1001',
+        courier_partner: 'mock_courier',
+        awb_number: 'MOCK-AWB-ORD1001',
+        status: 'IN_TRANSIT',
+      },
+    });
+    expect(response.body.data.history).toHaveLength(2);
+  });
+
+  it('returns not found when tracking an unknown order', async () => {
+    const response = await request(app).get('/api/v1/orders/UNKNOWN/track');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ORDER_NOT_FOUND',
+        message: 'Order not found: UNKNOWN',
+      },
+    });
+  });
 });

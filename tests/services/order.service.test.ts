@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { DuplicateOrderError, orderService } from '../../src/services/order.service.js';
+import {
+  DuplicateOrderError,
+  OrderNotFoundError,
+  orderService,
+} from '../../src/services/order.service.js';
 import { orderRepository } from '../../src/repositories/order.repository.js';
 
 describe('OrderService', () => {
@@ -34,5 +38,26 @@ describe('OrderService', () => {
     await orderService.createOrder(payload);
 
     await expect(orderService.createOrder(payload)).rejects.toBeInstanceOf(DuplicateOrderError);
+  });
+
+  it('tracks an existing order through the configured courier adapter', async () => {
+    await orderService.createOrder({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+
+    const tracking = await orderService.trackOrder('ORD-1001');
+
+    expect(tracking).toMatchObject({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+      awb_number: 'MOCK-AWB-ORD1001',
+      status: 'IN_TRANSIT',
+    });
+    expect(tracking.history).toHaveLength(2);
+  });
+
+  it('throws not found when tracking an unknown order', async () => {
+    await expect(orderService.trackOrder('UNKNOWN')).rejects.toBeInstanceOf(OrderNotFoundError);
   });
 });
