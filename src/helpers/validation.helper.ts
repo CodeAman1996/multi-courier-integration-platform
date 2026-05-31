@@ -1,5 +1,22 @@
 import Joi from 'joi';
 
+export type FieldValidationError = {
+  field: string;
+  message: string;
+};
+
+export class RequestValidationError extends Error {
+  readonly statusCode = 400;
+  readonly code = 'VALIDATION_ERROR';
+  readonly details: FieldValidationError[];
+
+  constructor(details: FieldValidationError[]) {
+    super('Request validation failed');
+    this.name = 'RequestValidationError';
+    this.details = details;
+  }
+}
+
 const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().integer().positive().default(3000),
@@ -35,4 +52,39 @@ export function validateEnv(source: NodeJS.ProcessEnv) {
     URBANEBOLT_PASSWORD?: string;
     URBANEBOLT_CUSTOMER_CODE?: string;
   };
+}
+
+export function validatePayload<T>(schema: Joi.Schema<T>, payload: unknown): T {
+  const { value, error } = schema.validate(payload, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (error) {
+    throw new RequestValidationError(formatJoiErrors(error));
+  }
+
+  return value;
+}
+
+export function validateCourierPartner(courierPartner: unknown, supportedCouriers: string[]) {
+  const schema = Joi.string()
+    .trim()
+    .lowercase()
+    .valid(...supportedCouriers)
+    .required()
+    .messages({
+      'any.only': `courier_partner must be one of: ${supportedCouriers.join(', ')}`,
+      'any.required': 'courier_partner is required',
+      'string.empty': 'courier_partner is required',
+    });
+
+  return validatePayload<string>(schema, courierPartner);
+}
+
+function formatJoiErrors(error: Joi.ValidationError): FieldValidationError[] {
+  return error.details.map((detail) => ({
+    field: detail.path.join('.') || 'value',
+    message: detail.message.replaceAll('"', ''),
+  }));
 }
