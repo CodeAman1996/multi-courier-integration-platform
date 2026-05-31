@@ -132,6 +132,38 @@ export async function trackOrder(req: Request, res: Response) {
   }
 }
 
+export async function getTrackingHistory(req: Request, res: Response) {
+  try {
+    const { orderId } = validateOrderIdParam(req.params);
+    const history = await orderService.getTrackingHistory(orderId);
+
+    return successResponse(res, history);
+  } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return errorResponse(res, {
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
+    }
+
+    if (error instanceof OrderNotFoundError) {
+      return errorResponse(res, {
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+      });
+    }
+
+    return errorResponse(res, {
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Something went wrong',
+    });
+  }
+}
+
 export async function cancelOrder(req: Request, res: Response) {
   try {
     const { orderId } = validateOrderIdParam(req.params);

@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { orderRepository } from '../../src/repositories/order.repository.js';
+import { trackingHistoryRepository } from '../../src/repositories/tracking-history.repository.js';
 
 describe('order routes', () => {
   const app = createApp();
 
   beforeEach(() => {
     orderRepository.clear();
+    trackingHistoryRepository.clear();
   });
 
   it('creates an order shipment with the mock courier', async () => {
@@ -126,6 +128,27 @@ describe('order routes', () => {
         message: 'Order not found: UNKNOWN',
       },
     });
+  });
+
+  it('returns stored tracking history for an order', async () => {
+    await request(app).post('/api/v1/orders').send({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+    await request(app).get('/api/v1/orders/ORD-1001/track');
+
+    const response = await request(app).get('/api/v1/orders/ORD-1001/tracking-history');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        order_id: 'ORD-1001',
+        courier_partner: 'mock_courier',
+        awb_number: 'MOCK-AWB-ORD1001',
+      },
+    });
+    expect(response.body.data.history).toHaveLength(2);
   });
 
   it('cancels an existing order shipment', async () => {
