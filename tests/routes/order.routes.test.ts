@@ -71,7 +71,7 @@ describe('order routes', () => {
         code: 'UNKNOWN_COURIER',
         message: 'Unsupported courier partner: delhivery',
         details: {
-          supported_couriers: ['mock_courier'],
+          supported_couriers: ['mock_courier', 'urbanebolt'],
         },
       },
     });

@@ -13,7 +13,7 @@ describe('courier routes', () => {
     expect(response.body).toEqual({
       success: true,
       data: {
-        supported_couriers: ['mock_courier'],
+        supported_couriers: ['mock_courier', 'urbanebolt'],
       },
     });
   });
@@ -41,7 +41,7 @@ describe('courier routes', () => {
         code: 'UNKNOWN_COURIER',
         message: 'Unsupported courier partner: delhivery',
         details: {
-          supported_couriers: ['mock_courier'],
+          supported_couriers: ['mock_courier', 'urbanebolt'],
         },
       },
     });
