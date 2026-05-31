@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { errorResponse } from './helpers/response.helper.js';
+import { courierRouter } from './routes/courier.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 
 export function createApp() {
@@ -10,6 +11,7 @@ export function createApp() {
 
   app.use('/health', healthRouter);
   app.use('/api/v1/health', healthRouter);
+  app.use('/api/v1/couriers', courierRouter);
 
   app.use((req, res) => {
     return errorResponse(res, {
