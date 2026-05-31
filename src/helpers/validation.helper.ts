@@ -38,6 +38,20 @@ const courierPartnerParamSchema = Joi.object({
   }),
 });
 
+const createOrderSchema = Joi.object({
+  order_id: Joi.string().trim().required().messages({
+    'any.required': 'order_id is required',
+    'string.empty': 'order_id is required',
+  }),
+  courier_partner: Joi.string().trim().lowercase().required().messages({
+    'any.required': 'courier_partner is required',
+    'string.empty': 'courier_partner is required',
+  }),
+  payment_mode: Joi.string().trim().uppercase().valid('COD', 'PREPAID').optional(),
+  declared_value: Joi.number().min(0).optional(),
+  collectable_value: Joi.number().min(0).optional(),
+}).unknown(true);
+
 export function validateEnv(source: NodeJS.ProcessEnv) {
   const { value, error } = envSchema.validate(source, {
     abortEarly: false,
@@ -91,6 +105,18 @@ export function validateCourierPartner(courierPartner: unknown, supportedCourier
 
 export function validateCourierPartnerParam(payload: unknown) {
   return validatePayload<{ courierPartner: string }>(courierPartnerParamSchema, payload);
+}
+
+export type CreateOrderRequest = {
+  order_id: string;
+  courier_partner: string;
+  payment_mode?: 'COD' | 'PREPAID';
+  declared_value?: number;
+  collectable_value?: number;
+} & Record<string, unknown>;
+
+export function validateCreateOrder(payload: unknown) {
+  return validatePayload<CreateOrderRequest>(createOrderSchema, payload);
 }
 
 function formatJoiErrors(error: Joi.ValidationError): FieldValidationError[] {
