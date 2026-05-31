@@ -63,6 +63,34 @@ export class OrderService {
       history: tracking.history,
     };
   }
+
+  async cancelOrder(orderId: string) {
+    const order = await this.repository.findByOrderId(orderId);
+
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    const courier = courierRegistry.get(order.courier_partner);
+    const cancellation = await courier.cancelShipment({
+      orderId: order.order_id,
+      awbNumber: order.awb_number,
+    });
+
+    const updatedOrder = await this.repository.updateStatus({
+      orderId: order.order_id,
+      status: cancellation.status,
+      courierResponsePayload: cancellation.rawResponse,
+    });
+
+    return {
+      order_id: order.order_id,
+      courier_partner: order.courier_partner,
+      awb_number: order.awb_number,
+      status: updatedOrder?.status ?? cancellation.status,
+      cancelled: cancellation.cancelled,
+    };
+  }
 }
 
 function toNormalizedOrder(payload: CreateOrderRequest): NormalizedOrder {

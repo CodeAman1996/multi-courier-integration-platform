@@ -21,6 +21,11 @@ export interface OrderRepository {
     payload: CreateOrderRequest;
     shipment: CreateShipmentResult;
   }): Promise<StoredOrder>;
+  updateStatus(input: {
+    orderId: string;
+    status: string;
+    courierResponsePayload: unknown;
+  }): Promise<StoredOrder | null>;
 }
 
 export class InMemoryOrderRepository implements OrderRepository {
@@ -49,6 +54,29 @@ export class InMemoryOrderRepository implements OrderRepository {
     this.orders.set(order.order_id, order);
 
     return order;
+  }
+
+  async updateStatus(input: {
+    orderId: string;
+    status: string;
+    courierResponsePayload: unknown;
+  }) {
+    const order = await this.findByOrderId(input.orderId);
+
+    if (!order) {
+      return null;
+    }
+
+    const updatedOrder: StoredOrder = {
+      ...order,
+      status: input.status,
+      courier_response_payload: input.courierResponsePayload,
+      updated_at: new Date().toISOString(),
+    };
+
+    this.orders.set(updatedOrder.order_id, updatedOrder);
+
+    return updatedOrder;
   }
 
   clear() {

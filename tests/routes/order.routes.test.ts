@@ -127,4 +127,38 @@ describe('order routes', () => {
       },
     });
   });
+
+  it('cancels an existing order shipment', async () => {
+    await request(app).post('/api/v1/orders').send({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+
+    const response = await request(app).post('/api/v1/orders/ORD-1001/cancel');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        order_id: 'ORD-1001',
+        courier_partner: 'mock_courier',
+        awb_number: 'MOCK-AWB-ORD1001',
+        status: 'CANCELLED',
+        cancelled: true,
+      },
+    });
+  });
+
+  it('returns not found when cancelling an unknown order', async () => {
+    const response = await request(app).post('/api/v1/orders/UNKNOWN/cancel');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ORDER_NOT_FOUND',
+        message: 'Order not found: UNKNOWN',
+      },
+    });
+  });
 });

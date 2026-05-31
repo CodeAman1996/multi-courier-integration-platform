@@ -60,4 +60,28 @@ describe('OrderService', () => {
   it('throws not found when tracking an unknown order', async () => {
     await expect(orderService.trackOrder('UNKNOWN')).rejects.toBeInstanceOf(OrderNotFoundError);
   });
+
+  it('cancels an existing order through the configured courier adapter', async () => {
+    await orderService.createOrder({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+
+    const cancellation = await orderService.cancelOrder('ORD-1001');
+
+    expect(cancellation).toEqual({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+      awb_number: 'MOCK-AWB-ORD1001',
+      status: 'CANCELLED',
+      cancelled: true,
+    });
+
+    const storedOrder = await orderRepository.findByOrderId('ORD-1001');
+    expect(storedOrder?.status).toBe('CANCELLED');
+  });
+
+  it('throws not found when cancelling an unknown order', async () => {
+    await expect(orderService.cancelOrder('UNKNOWN')).rejects.toBeInstanceOf(OrderNotFoundError);
+  });
 });
