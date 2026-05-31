@@ -6,10 +6,12 @@ import {
   orderService,
 } from '../../src/services/order.service.js';
 import { orderRepository } from '../../src/repositories/order.repository.js';
+import { trackingHistoryRepository } from '../../src/repositories/tracking-history.repository.js';
 
 describe('OrderService', () => {
   beforeEach(() => {
     orderRepository.clear();
+    trackingHistoryRepository.clear();
   });
 
   it('creates an order through the configured courier adapter', async () => {
@@ -55,6 +57,27 @@ describe('OrderService', () => {
       status: 'IN_TRANSIT',
     });
     expect(tracking.history).toHaveLength(2);
+
+    const storedHistory = await trackingHistoryRepository.findByOrderId('ORD-1001');
+    expect(storedHistory).toHaveLength(2);
+  });
+
+  it('returns append-only tracking history for an order', async () => {
+    await orderService.createOrder({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+    });
+    await orderService.trackOrder('ORD-1001');
+    await orderService.trackOrder('ORD-1001');
+
+    const result = await orderService.getTrackingHistory('ORD-1001');
+
+    expect(result).toMatchObject({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+      awb_number: 'MOCK-AWB-ORD1001',
+    });
+    expect(result.history).toHaveLength(4);
   });
 
   it('throws not found when tracking an unknown order', async () => {

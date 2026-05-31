@@ -3,6 +3,10 @@ import { UnknownCourierError } from '../couriers/courier-registry.js';
 import { courierRegistry } from '../couriers/courier-registry.instance.js';
 import type { BulkCreateOrdersRequest, CreateOrderRequest } from '../helpers/validation.helper.js';
 import { orderRepository, type OrderRepository } from '../repositories/order.repository.js';
+import {
+  trackingHistoryRepository,
+  type TrackingHistoryRepository,
+} from '../repositories/tracking-history.repository.js';
 
 export class DuplicateOrderError extends Error {
   readonly statusCode = 409;
@@ -25,7 +29,10 @@ export class OrderNotFoundError extends Error {
 }
 
 export class OrderService {
-  constructor(private readonly repository: OrderRepository) {}
+  constructor(
+    private readonly repository: OrderRepository,
+    private readonly trackingHistory: TrackingHistoryRepository,
+  ) {}
 
   async createOrder(payload: CreateOrderRequest) {
     const existingOrder = await this.repository.findByOrderId(payload.order_id);
@@ -98,12 +105,33 @@ export class OrderService {
       awbNumber: order.awb_number,
     });
 
+    await this.trackingHistory.append({
+      orderId: order.order_id,
+      awbNumber: order.awb_number,
+      tracking,
+    });
+
     return {
       order_id: order.order_id,
       courier_partner: order.courier_partner,
       awb_number: order.awb_number,
       status: tracking.status,
       history: tracking.history,
+    };
+  }
+
+  async getTrackingHistory(orderId: string) {
+    const order = await this.repository.findByOrderId(orderId);
+
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    return {
+      order_id: order.order_id,
+      courier_partner: order.courier_partner,
+      awb_number: order.awb_number,
+      history: await this.trackingHistory.findByOrderId(order.order_id),
     };
   }
 
@@ -147,7 +175,7 @@ function toNormalizedOrder(payload: CreateOrderRequest): NormalizedOrder {
   };
 }
 
-export const orderService = new OrderService(orderRepository);
+export const orderService = new OrderService(orderRepository, trackingHistoryRepository);
 
 function buildBulkFailure(orderId: string, error: { code: string; message: string; details?: unknown }) {
   return {
