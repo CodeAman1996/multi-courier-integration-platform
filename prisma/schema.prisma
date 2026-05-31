@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentMode {
+  COD
+  PREPAID
+}
+
+model Order {
+  id                     String            @id @default(uuid())
+  internalOrderId        String            @unique @map("internal_order_id")
+  courierPartner         String            @map("courier_partner")
+  courierOrderId         String?           @map("courier_order_id")
+  awbNumber              String?           @map("awb_number")
+  status                 OrderStatus       @default(CREATED)
+  paymentMode            PaymentMode?      @map("payment_mode")
+  originalRequestPayload Json              @map("original_request_payload")
+  courierRequestPayload  Json?             @map("courier_request_payload")
+  courierResponsePayload Json?             @map("courier_response_payload")
+  failureReason          String?           @map("failure_reason")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+  trackingHistory        TrackingHistory[]
+
+  @@index([courierPartner])
+  @@index([awbNumber])
+  @@index([status])
+  @@map("orders")
+}
+
+model TrackingHistory {
+  id         String      @id @default(uuid())
+  orderId    String      @map("order_id")
+  awbNumber  String?     @map("awb_number")
+  status     OrderStatus
+  location   String?
+  eventTime  DateTime?   @map("event_time")
+  rawPayload Json        @map("raw_payload")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([awbNumber])
+  @@index([status])
+  @@map("tracking_history")
+}
+
+model CourierToken {
+  id             String   @id @default(uuid())
+  courierPartner String   @unique @map("courier_partner")
+  accessToken    String   @map("access_token")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("courier_tokens")
+}
