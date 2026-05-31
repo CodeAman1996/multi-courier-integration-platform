@@ -31,6 +31,13 @@ const envSchema = Joi.object({
   URBANEBOLT_CUSTOMER_CODE: Joi.string().allow('').optional(),
 }).unknown(true);
 
+const courierPartnerParamSchema = Joi.object({
+  courierPartner: Joi.string().trim().lowercase().required().messages({
+    'any.required': 'courierPartner is required',
+    'string.empty': 'courierPartner is required',
+  }),
+});
+
 export function validateEnv(source: NodeJS.ProcessEnv) {
   const { value, error } = envSchema.validate(source, {
     abortEarly: false,
@@ -80,6 +87,10 @@ export function validateCourierPartner(courierPartner: unknown, supportedCourier
     });
 
   return validatePayload<string>(schema, courierPartner);
+}
+
+export function validateCourierPartnerParam(payload: unknown) {
+  return validatePayload<{ courierPartner: string }>(courierPartnerParamSchema, payload);
 }
 
 function formatJoiErrors(error: Joi.ValidationError): FieldValidationError[] {
