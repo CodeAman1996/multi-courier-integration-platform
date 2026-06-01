@@ -7,11 +7,13 @@ import {
 } from '../../src/services/order.service.js';
 import { orderRepository } from '../../src/repositories/order.repository.js';
 import { trackingHistoryRepository } from '../../src/repositories/tracking-history.repository.js';
+import { bulkOrderService, bulkOrderStatusStore } from '../../src/services/bulk-order.service.js';
 
 describe('OrderService', () => {
   beforeEach(() => {
     orderRepository.clear();
     trackingHistoryRepository.clear();
+    bulkOrderStatusStore.clear();
   });
 
   it('creates an order through the configured courier adapter', async () => {
@@ -108,8 +110,8 @@ describe('OrderService', () => {
     await expect(orderService.cancelOrder('UNKNOWN')).rejects.toBeInstanceOf(OrderNotFoundError);
   });
 
-  it('bulk creates orders and returns a summary', async () => {
-    const result = await orderService.bulkCreateOrders({
+  it('queues and processes a bulk create batch', async () => {
+    const queuedBatch = await bulkOrderService.enqueueBulkCreate({
       orders: [
         {
           order_id: 'ORD-1001',
@@ -122,8 +124,16 @@ describe('OrderService', () => {
       ],
     });
 
+    const result = await bulkOrderService.getBatch(queuedBatch.batch_id);
+
+    expect(queuedBatch).toMatchObject({
+      status: 'QUEUED',
+      total_orders: 2,
+    });
     expect(result).toMatchObject({
+      status: 'COMPLETED',
       total: 2,
+      completed: 2,
       success: 2,
       failed: 0,
     });
@@ -131,7 +141,7 @@ describe('OrderService', () => {
   });
 
   it('handles duplicate order ids inside a bulk payload', async () => {
-    const result = await orderService.bulkCreateOrders({
+    const queuedBatch = await bulkOrderService.enqueueBulkCreate({
       orders: [
         {
           order_id: 'ORD-1001',
@@ -143,9 +153,12 @@ describe('OrderService', () => {
         },
       ],
     });
+    const result = await bulkOrderService.getBatch(queuedBatch.batch_id);
 
     expect(result).toMatchObject({
+      status: 'COMPLETED',
       total: 2,
+      completed: 2,
       success: 1,
       failed: 1,
     });

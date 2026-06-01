@@ -33,9 +33,9 @@ Tracking history is append-only. Every tracking call stores courier events separ
 
 ## Bulk Processing
 
-Bulk create accepts up to 100 orders and returns per-order success/failure results. This implementation processes orders concurrently in-process and avoids permanent batch tables. The trade-off is that the HTTP request stays open while work completes; the benefit is a smaller implementation with clear partial-success behavior.
+Bulk create accepts up to 100 orders, creates a `batch_id`, and enqueues the work in BullMQ. A worker processes the batch and stores temporary status/results in Redis. This avoids permanent batch tables while keeping the API responsive.
 
-Redis/BullMQ can later be added behind the same `POST /api/v1/orders/bulk` request shape if asynchronous batch status becomes necessary.
+Clients can poll `GET /api/v1/orders/bulk/:batchId` to inspect progress and per-order success/failure results.
 
 ## Error Handling
 

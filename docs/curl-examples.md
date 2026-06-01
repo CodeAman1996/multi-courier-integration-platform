@@ -45,3 +45,9 @@ curl -X POST http://localhost:3000/api/v1/orders/bulk \
   -H "Content-Type: application/json" \
   -d "{\"orders\":[{\"order_id\":\"ORD-1001\",\"courier_partner\":\"mock_courier\"},{\"order_id\":\"ORD-1002\",\"courier_partner\":\"mock_courier\"}]}"
 ```
+
+Get bulk batch status:
+
+```bash
+curl http://localhost:3000/api/v1/orders/bulk/<batch_id>
+```

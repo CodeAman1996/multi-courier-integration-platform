@@ -9,7 +9,7 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - Provide a courier-agnostic REST API for internal consumers.
 - Keep courier-specific payloads and response formats isolated inside adapter modules.
 - Persist orders, courier responses, and tracking history for audit and debugging.
-- Support bulk order creation with concurrent processing and per-order results.
+- Support bulk order creation with Redis/BullMQ background processing and per-order results.
 - Normalize validation errors, courier errors, retries, and authentication failures.
 
 ## Tech Stack
@@ -19,6 +19,8 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - TypeScript
 - PostgreSQL
 - Prisma
+- Redis
+- BullMQ
 - Joi
 - Axios
 - Winston
@@ -61,6 +63,7 @@ POST /api/v1/orders
 GET  /api/v1/orders/:orderId/track
 POST /api/v1/orders/:orderId/cancel
 POST /api/v1/orders/bulk
+GET  /api/v1/orders/bulk/:batchId
 GET  /api/v1/orders/:orderId/tracking-history
 GET  /api/v1/couriers
 GET  /api/v1/couriers/:courierPartner
@@ -82,9 +85,9 @@ The rest of the payload follows the platform's normalized internal schema. Consu
 
 ## Bulk Processing Approach
 
-Bulk order creation currently processes up to 100 orders with concurrent service calls and returns per-order results in the same response.
+Bulk order creation queues up to 100 orders with BullMQ and returns a `batch_id` immediately.
 
-This keeps the assignment implementation simple while still avoiding sequential courier calls and supporting partial success. PostgreSQL is the permanent source of truth for orders, tracking history, and courier auth tokens through Prisma-backed repositories. Redis/BullMQ can be introduced later without changing the consumer-facing request schema.
+The worker processes each batch concurrently and stores temporary batch status/results in Redis. PostgreSQL is the permanent source of truth for orders, tracking history, and courier auth tokens through Prisma-backed repositories.
 
 ```txt
 POST /api/v1/orders/bulk
@@ -93,13 +96,16 @@ POST /api/v1/orders/bulk
 Validate up to 100 orders
         |
         v
-Process orders concurrently
+Queue batch in BullMQ
         |
         v
-Return per-order success/failure results
+Worker processes orders concurrently
+        |
+        v
+Store per-order results in Redis
 ```
 
-The system intentionally avoids permanent `BulkBatch` and `BulkBatchItem` tables. If async processing is added later, Redis can hold temporary batch status.
+The system intentionally avoids permanent `BulkBatch` and `BulkBatchItem` tables because Redis holds temporary batch status.
 
 ## Planned Folder Structure
 
@@ -209,6 +215,10 @@ curl -X POST http://localhost:3000/api/v1/orders/ORD-1001/cancel
 curl -X POST http://localhost:3000/api/v1/orders/bulk \
   -H "Content-Type: application/json" \
   -d "{\"orders\":[{\"order_id\":\"ORD-1001\",\"courier_partner\":\"mock_courier\"},{\"order_id\":\"ORD-1002\",\"courier_partner\":\"mock_courier\"}]}"
+```
+
+```bash
+curl http://localhost:3000/api/v1/orders/bulk/<batch_id>
 ```
 
 ## Design Pattern
