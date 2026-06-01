@@ -2,6 +2,7 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 
 import { swaggerSpec } from './config/swagger.js';
+import { requestIdHandler } from './helpers/request-id.helper.js';
 import { errorResponse } from './helpers/response.helper.js';
 import { courierRouter } from './routes/courier.routes.js';
 import { healthRouter } from './routes/health.routes.js';
@@ -11,6 +12,7 @@ export function createApp() {
   const app = express();
 
   app.use(express.json({ limit: '1mb' }));
+  app.use(requestIdHandler);
 
   app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -25,7 +27,7 @@ export function createApp() {
       statusCode: 404,
       code: 'ROUTE_NOT_FOUND',
       message: `Route ${req.method} ${req.originalUrl} was not found`,
-    });
+    }, req);
   });
 
   return app;

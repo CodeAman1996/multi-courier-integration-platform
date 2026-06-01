@@ -8,6 +8,7 @@ export const BULK_ORDER_QUEUE_NAME = 'bulk-order-create';
 export type BulkOrderJobData = {
   batchId: string;
   orders: CreateOrderRequest[];
+  requestId?: string;
 };
 
 export const bulkOrderQueue =

@@ -60,6 +60,18 @@ describe('order routes', () => {
     });
   });
 
+  it('returns the request id header on API responses', async () => {
+    const response = await request(app)
+      .post('/api/v1/orders')
+      .set('x-request-id', 'test-request-id')
+      .send({
+        courier_partner: 'mock_courier',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.headers['x-request-id']).toBe('test-request-id');
+  });
+
   it('rejects unknown courier partners', async () => {
     const response = await request(app).post('/api/v1/orders').send({
       order_id: 'ORD-1001',

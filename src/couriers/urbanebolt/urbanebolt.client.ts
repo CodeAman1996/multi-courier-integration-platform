@@ -1,7 +1,8 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios';
 
+import { env } from '../../config/env.js';
 import { retry } from '../../utils/retry.js';
-import { mapUrbaneBoltError } from './urbanebolt.error-mapper.js';
+import { isRetryableCourierError, mapUrbaneBoltError } from './urbanebolt.error-mapper.js';
 import type {
   UrbaneBoltCancelResponse,
   UrbaneBoltManifestPayload,
@@ -63,8 +64,9 @@ export class UrbaneBoltClient {
 
   private async request<T>(operation: () => Promise<{ data: T }>) {
     return retry({
-      retries: 2,
-      delayMs: 250,
+      retries: env.COURIER_RETRY_ATTEMPTS,
+      delayMs: env.COURIER_RETRY_DELAY_MS,
+      shouldRetry: isRetryableCourierError,
       operation: async () => {
         try {
           const response = await operation();

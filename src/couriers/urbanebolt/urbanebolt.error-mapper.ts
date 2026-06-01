@@ -25,3 +25,7 @@ export function mapUrbaneBoltError(statusCode: number, rawError: unknown) {
 export function isRetryableCourierError(error: unknown) {
   return error instanceof CourierApiError && error.statusCode >= 500;
 }
+
+export function isCourierAuthError(error: unknown) {
+  return error instanceof CourierApiError && (error.statusCode === 401 || error.statusCode === 403);
+}

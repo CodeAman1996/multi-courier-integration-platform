@@ -1,4 +1,6 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+
+import { getFailureContextFromRequest, logFailure } from './error-log.helper.js';
 
 type SuccessResponseInput<T> = {
   statusCode?: number;
@@ -28,8 +30,10 @@ export function successResponse<T>(
   });
 }
 
-export function errorResponse(res: Response, input: unknown) {
+export function errorResponse(res: Response, input: unknown, req?: Request) {
   const error = normalizeError(input);
+
+  logFailure('API request failed', input, req ? getFailureContextFromRequest(req) : {});
 
   return res.status(error.statusCode).json({
     success: false,

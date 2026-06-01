@@ -40,6 +40,10 @@ export class CourierRegistry {
     return this.adapters.has(normalizePartnerCode(courierPartner));
   }
 
+  unregister(courierPartner: string) {
+    this.adapters.delete(normalizePartnerCode(courierPartner));
+  }
+
   listSupportedCouriers() {
     return [...this.adapters.keys()].sort();
   }

@@ -4,7 +4,7 @@ export const swaggerSpec = {
     title: 'Multi-Courier Integration Platform API',
     version: '1.0.0',
     description:
-      'Unified API for courier listing, shipment creation, tracking, cancellation, and BullMQ-based bulk order processing.',
+      'Unified API for courier listing, shipment creation, tracking, cancellation, and BullMQ-based bulk order processing. Clients can pass x-request-id for traceable logs.',
   },
   servers: [
     {
@@ -73,6 +73,7 @@ export const swaggerSpec = {
       post: {
         tags: ['Orders'],
         summary: 'Create a shipment order',
+        parameters: [{ $ref: '#/components/parameters/RequestId' }],
         requestBody: {
           required: true,
           content: {
@@ -106,7 +107,10 @@ export const swaggerSpec = {
       get: {
         tags: ['Orders'],
         summary: 'Track an order',
-        parameters: [{ $ref: '#/components/parameters/OrderId' }],
+        parameters: [
+          { $ref: '#/components/parameters/RequestId' },
+          { $ref: '#/components/parameters/OrderId' },
+        ],
         responses: {
           '200': {
             description: 'Current tracking status',
@@ -124,7 +128,10 @@ export const swaggerSpec = {
       get: {
         tags: ['Orders'],
         summary: 'Get stored tracking history',
-        parameters: [{ $ref: '#/components/parameters/OrderId' }],
+        parameters: [
+          { $ref: '#/components/parameters/RequestId' },
+          { $ref: '#/components/parameters/OrderId' },
+        ],
         responses: {
           '200': {
             description: 'Tracking history',
@@ -142,7 +149,10 @@ export const swaggerSpec = {
       post: {
         tags: ['Orders'],
         summary: 'Cancel an order',
-        parameters: [{ $ref: '#/components/parameters/OrderId' }],
+        parameters: [
+          { $ref: '#/components/parameters/RequestId' },
+          { $ref: '#/components/parameters/OrderId' },
+        ],
         responses: {
           '200': {
             description: 'Cancellation result',
@@ -162,6 +172,7 @@ export const swaggerSpec = {
         summary: 'Queue bulk order creation',
         description:
           'Queues up to 100 orders in BullMQ and returns a batch id immediately. Use the batch status API to check results.',
+        parameters: [{ $ref: '#/components/parameters/RequestId' }],
         requestBody: {
           required: true,
           content: {
@@ -205,7 +216,10 @@ export const swaggerSpec = {
       get: {
         tags: ['Bulk Orders'],
         summary: 'Get bulk order batch status',
-        parameters: [{ $ref: '#/components/parameters/BatchId' }],
+        parameters: [
+          { $ref: '#/components/parameters/RequestId' },
+          { $ref: '#/components/parameters/BatchId' },
+        ],
         responses: {
           '200': {
             description: 'Batch status and per-order results',
@@ -222,6 +236,14 @@ export const swaggerSpec = {
   },
   components: {
     parameters: {
+      RequestId: {
+        name: 'x-request-id',
+        in: 'header',
+        required: false,
+        schema: { type: 'string' },
+        description: 'Optional request id used in API logs. The same value is returned in the response header.',
+        example: 'req-123',
+      },
       OrderId: {
         name: 'orderId',
         in: 'path',
@@ -365,6 +387,16 @@ export const swaggerSpec = {
           courier_order_id: { type: 'string', example: 'MOCK-ORD-1001' },
           awb_number: { type: 'string', example: 'AWB-ORD-1001' },
           status: { type: 'string', example: 'CREATED' },
+          courier_request_payload: {
+            type: 'object',
+            nullable: true,
+            description: 'Actual payload sent to the courier for audit/debugging.',
+          },
+          failure_reason: {
+            type: 'string',
+            nullable: true,
+            example: 'COURIER_UNAVAILABLE: Courier service is temporarily unavailable',
+          },
         },
       },
       TrackOrderResponse: {

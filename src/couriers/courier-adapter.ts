@@ -11,6 +11,8 @@ import type {
 export interface CourierAdapter {
   readonly partnerCode: CourierPartnerCode;
 
+  getCreateShipmentRequestPayload?(order: NormalizedOrder): unknown;
+
   createShipment(order: NormalizedOrder): Promise<CreateShipmentResult>;
 
   trackShipment(input: TrackShipmentInput): Promise<TrackShipmentResult>;

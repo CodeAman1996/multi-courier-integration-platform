@@ -14,6 +14,7 @@ export type CreateShipmentResult = {
   courierOrderId?: string;
   awbNumber?: string;
   status: string;
+  courierRequestPayload?: unknown;
   rawResponse: unknown;
 };
 

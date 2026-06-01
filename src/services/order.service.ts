@@ -1,5 +1,8 @@
 import type { NormalizedOrder } from '../couriers/courier.types.js';
 import { courierRegistry } from '../couriers/courier-registry.instance.js';
+import { UnknownCourierError } from '../couriers/courier-registry.js';
+import { CourierApiError } from '../couriers/urbanebolt/urbanebolt.error-mapper.js';
+import { logFailure } from '../helpers/error-log.helper.js';
 import type { CreateOrderRequest } from '../helpers/validation.helper.js';
 import { orderRepository, type OrderRepository } from '../repositories/order.repository.js';
 import {
@@ -33,7 +36,7 @@ export class OrderService {
     private readonly trackingHistory: TrackingHistoryRepository,
   ) {}
 
-  async createOrder(payload: CreateOrderRequest) {
+  async createOrder(payload: CreateOrderRequest, options: { requestId?: string } = {}) {
     const existingOrder = await this.repository.findByOrderId(payload.order_id);
 
     if (existingOrder) {
@@ -41,11 +44,36 @@ export class OrderService {
     }
 
     const courier = courierRegistry.get(payload.courier_partner);
-    const shipment = await courier.createShipment(toNormalizedOrder(payload));
+    const normalizedOrder = toNormalizedOrder(payload);
+    const courierRequestPayload = courier.getCreateShipmentRequestPayload?.(normalizedOrder);
+    let shipment;
+
+    try {
+      shipment = await courier.createShipment(normalizedOrder);
+    } catch (error) {
+      if (!(error instanceof UnknownCourierError)) {
+        await this.repository.createFailed({
+          payload,
+          courierRequestPayload,
+          failureReason: normalizeFailureReason(error),
+        });
+      }
+
+      logFailure('Order shipment failed', error, {
+        orderId: payload.order_id,
+        courierPartner: payload.courier_partner,
+        requestId: options.requestId,
+      });
+
+      throw error;
+    }
 
     return this.repository.create({
       payload,
-      shipment,
+      shipment: {
+        ...shipment,
+        courierRequestPayload: shipment.courierRequestPayload ?? courierRequestPayload,
+      },
     });
   }
 
@@ -119,6 +147,18 @@ export class OrderService {
       cancelled: cancellation.cancelled,
     };
   }
+}
+
+function normalizeFailureReason(error: unknown) {
+  if (error instanceof CourierApiError) {
+    return `${error.code}: ${error.message}`;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Order shipment failed';
 }
 
 function toNormalizedOrder(payload: CreateOrderRequest): NormalizedOrder {

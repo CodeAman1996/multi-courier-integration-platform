@@ -12,6 +12,7 @@ export function startBulkOrderWorker() {
       logger.info('Processing bulk order job', {
         job_id: job.id,
         batch_id: job.data.batchId,
+        request_id: job.data.requestId,
         total_orders: job.data.orders.length,
       });
 
@@ -27,6 +28,7 @@ export function startBulkOrderWorker() {
     logger.info('Bulk order job completed', {
       job_id: job.id,
       batch_id: job.data.batchId,
+      request_id: job.data.requestId,
     });
   });
 
@@ -34,6 +36,7 @@ export function startBulkOrderWorker() {
     logger.error('Bulk order job failed', {
       job_id: job?.id,
       batch_id: job?.data.batchId,
+      request_id: job?.data.requestId,
       error,
     });
   });

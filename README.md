@@ -11,6 +11,7 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - Persist orders, courier responses, and tracking history for audit and debugging.
 - Support bulk order creation with Redis/BullMQ background processing and per-order results.
 - Normalize validation errors, courier errors, retries, and authentication failures.
+- Log failures with request id, order id, courier partner, error type, and stack trace where available.
 
 ## Tech Stack
 
@@ -109,6 +110,27 @@ Store per-order results in Redis
 
 The system intentionally avoids permanent `BulkBatch` and `BulkBatchItem` tables because Redis holds temporary batch status.
 
+## Error Handling
+
+All endpoints use the same error response shape:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": []
+  }
+}
+```
+
+Validation errors return HTTP 400 with field-level details. Unknown `courier_partner` values return HTTP 400 with the supported courier list.
+
+Courier 4xx errors are mapped to platform-owned error codes such as `COURIER_VALIDATION_FAILED` or `COURIER_AUTH_FAILED`; raw courier errors are not returned to API clients. Courier 5xx, timeout, and network failures are retried with backoff using configurable retry settings. If shipment creation still fails, the order is stored with `FAILED` status and `failure_reason` for later reconciliation.
+
+Courier authentication failures trigger a token refresh and one retry. API failures are logged with `order_id`, `courier_partner`, `request_id`, `error_type`, and stack trace where available. Clients may pass `x-request-id`; otherwise the API generates one and returns it in the response header.
+
 ## Planned Folder Structure
 
 ```txt
@@ -187,6 +209,21 @@ npm test
 npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:studio
+```
+
+## Environment Variables
+
+```txt
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/DB_NAME?schema=public
+REDIS_URL=redis://localhost:6379
+PORT=3000
+LOG_LEVEL=info
+COURIER_RETRY_ATTEMPTS=2
+COURIER_RETRY_DELAY_MS=250
+URBANEBOLT_BASE_URL=https://uat.urbanebolt.in
+URBANEBOLT_USERNAME=
+URBANEBOLT_PASSWORD=
+URBANEBOLT_CUSTOMER_CODE=
 ```
 
 ## Swagger Docs
