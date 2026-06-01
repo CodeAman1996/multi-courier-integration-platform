@@ -72,6 +72,13 @@ const orderIdParamSchema = Joi.object({
   }),
 });
 
+const batchIdParamSchema = Joi.object({
+  batchId: Joi.string().trim().required().messages({
+    'any.required': 'batchId is required',
+    'string.empty': 'batchId is required',
+  }),
+});
+
 export function validateEnv(source: NodeJS.ProcessEnv) {
   const { value, error } = envSchema.validate(source, {
     abortEarly: false,
@@ -149,6 +156,10 @@ export function validateBulkCreateOrders(payload: unknown) {
 
 export function validateOrderIdParam(payload: unknown) {
   return validatePayload<{ orderId: string }>(orderIdParamSchema, payload);
+}
+
+export function validateBatchIdParam(payload: unknown) {
+  return validatePayload<{ batchId: string }>(batchIdParamSchema, payload);
 }
 
 function formatJoiErrors(error: Joi.ValidationError): FieldValidationError[] {

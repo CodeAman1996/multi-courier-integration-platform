@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { orderRepository } from '../../src/repositories/order.repository.js';
 import { trackingHistoryRepository } from '../../src/repositories/tracking-history.repository.js';
+import { bulkOrderStatusStore } from '../../src/services/bulk-order.service.js';
 
 describe('order routes', () => {
   const app = createApp();
@@ -11,6 +12,7 @@ describe('order routes', () => {
   beforeEach(() => {
     orderRepository.clear();
     trackingHistoryRepository.clear();
+    bulkOrderStatusStore.clear();
   });
 
   it('creates an order shipment with the mock courier', async () => {
@@ -185,7 +187,7 @@ describe('order routes', () => {
     });
   });
 
-  it('bulk creates orders with per-order results', async () => {
+  it('queues a bulk create batch and returns batch status', async () => {
     const response = await request(app)
       .post('/api/v1/orders/bulk')
       .send({
@@ -201,11 +203,26 @@ describe('order routes', () => {
         ],
       });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(response.body).toMatchObject({
       success: true,
       data: {
+        status: 'QUEUED',
+        total_orders: 2,
+      },
+    });
+
+    const batchId = response.body.data.batch_id;
+    const batchResponse = await request(app).get(`/api/v1/orders/bulk/${batchId}`);
+
+    expect(batchResponse.status).toBe(200);
+    expect(batchResponse.body).toMatchObject({
+      success: true,
+      data: {
+        batch_id: batchId,
+        status: 'COMPLETED',
         total: 2,
+        completed: 2,
         success: 2,
         failed: 0,
         results: [
@@ -234,7 +251,7 @@ describe('order routes', () => {
     });
   });
 
-  it('bulk creates with partial failures', async () => {
+  it('stores partial failures for a bulk create batch', async () => {
     const response = await request(app)
       .post('/api/v1/orders/bulk')
       .send({
@@ -250,11 +267,17 @@ describe('order routes', () => {
         ],
       });
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
+    const batchId = response.body.data.batch_id;
+    const batchResponse = await request(app).get(`/api/v1/orders/bulk/${batchId}`);
+
+    expect(batchResponse.status).toBe(200);
+    expect(batchResponse.body).toMatchObject({
       success: true,
       data: {
+        batch_id: batchId,
+        status: 'COMPLETED',
         total: 2,
+        completed: 2,
         success: 1,
         failed: 1,
         results: [
@@ -271,6 +294,19 @@ describe('order routes', () => {
             },
           },
         ],
+      },
+    });
+  });
+
+  it('returns not found for an unknown bulk batch', async () => {
+    const response = await request(app).get('/api/v1/orders/bulk/unknown-batch');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'BATCH_NOT_FOUND',
+        message: 'Bulk order batch not found: unknown-batch',
       },
     });
   });
