@@ -1,4 +1,5 @@
 import type { TrackShipmentResult } from '../couriers/courier.types.js';
+import { prisma } from '../prisma/client.js';
 
 export type StoredTrackingHistory = {
   id: string;
@@ -18,6 +19,7 @@ export interface TrackingHistoryRepository {
     tracking: TrackShipmentResult;
   }): Promise<StoredTrackingHistory[]>;
   findByOrderId(orderId: string): Promise<StoredTrackingHistory[]>;
+  clear(): Promise<void> | void;
 }
 
 export class InMemoryTrackingHistoryRepository implements TrackingHistoryRepository {
@@ -51,4 +53,83 @@ export class InMemoryTrackingHistoryRepository implements TrackingHistoryReposit
   }
 }
 
-export const trackingHistoryRepository = new InMemoryTrackingHistoryRepository();
+export class PrismaTrackingHistoryRepository implements TrackingHistoryRepository {
+  constructor(private readonly client = prisma) {}
+
+  async append(input: { orderId: string; awbNumber?: string; tracking: TrackShipmentResult }) {
+    const order = await this.client.order.findUnique({
+      where: {
+        internalOrderId: input.orderId,
+      },
+    });
+
+    if (!order) {
+      return [];
+    }
+
+    const createdHistory = await Promise.all(
+      input.tracking.history.map((event) =>
+        this.client.trackingHistory.create({
+          data: {
+            orderId: order.id,
+            awbNumber: input.awbNumber,
+            status: event.status as never,
+            location: event.location,
+            eventTime: event.eventTime ? new Date(event.eventTime) : undefined,
+            rawPayload: event.rawPayload as never,
+          },
+        }),
+      ),
+    );
+
+    return createdHistory.map((history) => mapPrismaTrackingHistory(history, input.orderId));
+  }
+
+  async findByOrderId(orderId: string) {
+    const order = await this.client.order.findUnique({
+      where: {
+        internalOrderId: orderId,
+      },
+      include: {
+        trackingHistory: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return [];
+    }
+
+    return order.trackingHistory.map((history) => mapPrismaTrackingHistory(history, order.internalOrderId));
+  }
+
+  async clear() {
+    await this.client.trackingHistory.deleteMany();
+  }
+}
+
+type PrismaTrackingHistoryRecord = Awaited<ReturnType<typeof prisma.trackingHistory.create>>;
+
+function mapPrismaTrackingHistory(
+  history: PrismaTrackingHistoryRecord,
+  internalOrderId: string,
+): StoredTrackingHistory {
+  return {
+    id: history.id,
+    order_id: internalOrderId,
+    awb_number: history.awbNumber ?? undefined,
+    status: history.status,
+    location: history.location ?? undefined,
+    event_time: history.eventTime?.toISOString(),
+    raw_payload: history.rawPayload,
+    created_at: history.createdAt.toISOString(),
+  };
+}
+
+export const trackingHistoryRepository =
+  process.env.NODE_ENV === 'test'
+    ? new InMemoryTrackingHistoryRepository()
+    : new PrismaTrackingHistoryRepository();

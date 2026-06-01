@@ -1,3 +1,5 @@
+import { prisma } from '../prisma/client.js';
+
 export type StoredCourierToken = {
   courier_partner: string;
   access_token: string;
@@ -13,6 +15,7 @@ export interface CourierTokenRepository {
     accessToken: string;
     expiresAt: Date;
   }): Promise<StoredCourierToken>;
+  clear(): Promise<void> | void;
 }
 
 export class InMemoryCourierTokenRepository implements CourierTokenRepository {
@@ -43,4 +46,56 @@ export class InMemoryCourierTokenRepository implements CourierTokenRepository {
   }
 }
 
-export const courierTokenRepository = new InMemoryCourierTokenRepository();
+export class PrismaCourierTokenRepository implements CourierTokenRepository {
+  constructor(private readonly client = prisma) {}
+
+  async findByCourierPartner(courierPartner: string) {
+    const token = await this.client.courierToken.findUnique({
+      where: {
+        courierPartner,
+      },
+    });
+
+    return token ? mapPrismaCourierToken(token) : null;
+  }
+
+  async upsert(input: { courierPartner: string; accessToken: string; expiresAt: Date }) {
+    const token = await this.client.courierToken.upsert({
+      where: {
+        courierPartner: input.courierPartner,
+      },
+      create: {
+        courierPartner: input.courierPartner,
+        accessToken: input.accessToken,
+        expiresAt: input.expiresAt,
+      },
+      update: {
+        accessToken: input.accessToken,
+        expiresAt: input.expiresAt,
+      },
+    });
+
+    return mapPrismaCourierToken(token);
+  }
+
+  async clear() {
+    await this.client.courierToken.deleteMany();
+  }
+}
+
+type PrismaCourierTokenRecord = Awaited<ReturnType<typeof prisma.courierToken.findUnique>>;
+
+function mapPrismaCourierToken(token: NonNullable<PrismaCourierTokenRecord>): StoredCourierToken {
+  return {
+    courier_partner: token.courierPartner,
+    access_token: token.accessToken,
+    expires_at: token.expiresAt.toISOString(),
+    created_at: token.createdAt.toISOString(),
+    updated_at: token.updatedAt.toISOString(),
+  };
+}
+
+export const courierTokenRepository =
+  process.env.NODE_ENV === 'test'
+    ? new InMemoryCourierTokenRepository()
+    : new PrismaCourierTokenRepository();
