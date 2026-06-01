@@ -23,7 +23,11 @@ const envSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly')
     .default('info'),
-  DATABASE_URL: Joi.string().optional(),
+  DATABASE_URL: Joi.when('NODE_ENV', {
+    is: 'test',
+    then: Joi.string().optional(),
+    otherwise: Joi.string().required(),
+  }),
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
   URBANEBOLT_BASE_URL: Joi.string().uri().default('https://uat.urbanebolt.in'),
   URBANEBOLT_USERNAME: Joi.string().allow('').optional(),

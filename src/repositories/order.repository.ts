@@ -1,5 +1,6 @@
 import type { CreateShipmentResult } from '../couriers/courier.types.js';
 import type { CreateOrderRequest } from '../helpers/validation.helper.js';
+import { prisma } from '../prisma/client.js';
 
 export type StoredOrder = {
   id: string;
@@ -26,6 +27,7 @@ export interface OrderRepository {
     status: string;
     courierResponsePayload: unknown;
   }): Promise<StoredOrder | null>;
+  clear(): Promise<void> | void;
 }
 
 export class InMemoryOrderRepository implements OrderRepository {
@@ -84,4 +86,82 @@ export class InMemoryOrderRepository implements OrderRepository {
   }
 }
 
-export const orderRepository = new InMemoryOrderRepository();
+export class PrismaOrderRepository implements OrderRepository {
+  constructor(private readonly client = prisma) {}
+
+  async findByOrderId(orderId: string) {
+    const order = await this.client.order.findUnique({
+      where: {
+        internalOrderId: orderId,
+      },
+    });
+
+    return order ? mapPrismaOrder(order) : null;
+  }
+
+  async create(input: { payload: CreateOrderRequest; shipment: CreateShipmentResult }) {
+    const order = await this.client.order.create({
+      data: {
+        internalOrderId: input.payload.order_id,
+        courierPartner: input.shipment.courierPartner,
+        courierOrderId: input.shipment.courierOrderId,
+        awbNumber: input.shipment.awbNumber,
+        status: input.shipment.status as never,
+        paymentMode: input.payload.payment_mode,
+        originalRequestPayload: input.payload as never,
+        courierResponsePayload: input.shipment.rawResponse as never,
+      },
+    });
+
+    return mapPrismaOrder(order);
+  }
+
+  async updateStatus(input: {
+    orderId: string;
+    status: string;
+    courierResponsePayload: unknown;
+  }) {
+    const existingOrder = await this.findByOrderId(input.orderId);
+
+    if (!existingOrder) {
+      return null;
+    }
+
+    const order = await this.client.order.update({
+      where: {
+        internalOrderId: input.orderId,
+      },
+      data: {
+        status: input.status as never,
+        courierResponsePayload: input.courierResponsePayload as never,
+      },
+    });
+
+    return mapPrismaOrder(order);
+  }
+
+  async clear() {
+    await this.client.order.deleteMany();
+  }
+}
+
+type PrismaOrderRecord = Awaited<ReturnType<typeof prisma.order.findUnique>>;
+
+function mapPrismaOrder(order: NonNullable<PrismaOrderRecord>): StoredOrder {
+  return {
+    id: order.id,
+    order_id: order.internalOrderId,
+    courier_partner: order.courierPartner,
+    courier_order_id: order.courierOrderId ?? undefined,
+    awb_number: order.awbNumber ?? undefined,
+    status: order.status,
+    payment_mode: order.paymentMode ?? undefined,
+    original_request_payload: order.originalRequestPayload as CreateOrderRequest,
+    courier_response_payload: order.courierResponsePayload,
+    created_at: order.createdAt.toISOString(),
+    updated_at: order.updatedAt.toISOString(),
+  };
+}
+
+export const orderRepository =
+  process.env.NODE_ENV === 'test' ? new InMemoryOrderRepository() : new PrismaOrderRepository();

@@ -9,7 +9,7 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - Provide a courier-agnostic REST API for internal consumers.
 - Keep courier-specific payloads and response formats isolated inside adapter modules.
 - Persist orders, courier responses, and tracking history for audit and debugging.
-- Support bulk order creation with fast API responses using Redis/BullMQ background processing.
+- Support bulk order creation with concurrent processing and per-order results.
 - Normalize validation errors, courier errors, retries, and authentication failures.
 
 ## Tech Stack
@@ -19,8 +19,6 @@ The first concrete courier integration is UrbaneBolt. The architecture is design
 - TypeScript
 - PostgreSQL
 - Prisma
-- Redis
-- BullMQ
 - Joi
 - Axios
 - Winston
@@ -86,7 +84,7 @@ The rest of the payload follows the platform's normalized internal schema. Consu
 
 Bulk order creation currently processes up to 100 orders with concurrent service calls and returns per-order results in the same response.
 
-This keeps the assignment implementation simple while still avoiding sequential courier calls and supporting partial success. PostgreSQL remains the permanent source of truth for orders and tracking history. Redis/BullMQ can be introduced later without changing the consumer-facing request schema.
+This keeps the assignment implementation simple while still avoiding sequential courier calls and supporting partial success. PostgreSQL is the permanent source of truth for orders, tracking history, and courier auth tokens through Prisma-backed repositories. Redis/BullMQ can be introduced later without changing the consumer-facing request schema.
 
 ```txt
 POST /api/v1/orders/bulk
@@ -169,7 +167,7 @@ The initial PostgreSQL schema will focus on permanent business data:
 - `TrackingHistory`
 - `CourierToken`
 
-Bulk batch progress is returned directly in the response and is not stored permanently.
+Orders, tracking history, and courier auth tokens are stored in PostgreSQL through Prisma repositories. Bulk batch progress is returned directly in the response and is not stored permanently.
 
 ## Development Scripts
 

@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/CodeAman1996/multi-courier-integration-platform#readme",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "axios": "^1.16.1",
     "bullmq": "^5.77.6",
@@ -33,6 +34,7 @@
     "express": "^5.2.1",
     "ioredis": "^5.11.0",
     "joi": "^18.2.1",
+    "pg": "^8.21.0",
     "uuid": "^14.0.0",
     "winston": "^3.19.0"
   },
