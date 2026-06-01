@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { errorResponse, successResponse } from '../helpers/response.helper.js';
+import { getRequestId } from '../helpers/request-id.helper.js';
 import {
   validateBatchIdParam,
   validateBulkCreateOrders,
@@ -13,7 +14,7 @@ import { orderService } from '../services/order.service.js';
 export async function createOrder(req: Request, res: Response) {
   try {
     const payload = validateCreateOrder(req.body);
-    const order = await orderService.createOrder(payload);
+    const order = await orderService.createOrder(payload, { requestId: getRequestId(req) });
 
     return successResponse(res, {
       statusCode: 201,
@@ -21,21 +22,21 @@ export async function createOrder(req: Request, res: Response) {
       data: order,
     });
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }
 
 export async function bulkCreateOrders(req: Request, res: Response) {
   try {
     const payload = validateBulkCreateOrders(req.body);
-    const batch = await bulkOrderService.enqueueBulkCreate(payload);
+    const batch = await bulkOrderService.enqueueBulkCreate(payload, { requestId: getRequestId(req) });
 
     return successResponse(res, {
       statusCode: 202,
       data: batch,
     });
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }
 
@@ -46,7 +47,7 @@ export async function getBulkOrderBatch(req: Request, res: Response) {
 
     return successResponse(res, batch);
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }
 
@@ -57,7 +58,7 @@ export async function trackOrder(req: Request, res: Response) {
 
     return successResponse(res, tracking);
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }
 
@@ -68,7 +69,7 @@ export async function getTrackingHistory(req: Request, res: Response) {
 
     return successResponse(res, history);
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }
 
@@ -79,6 +80,6 @@ export async function cancelOrder(req: Request, res: Response) {
 
     return successResponse(res, cancellation);
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }

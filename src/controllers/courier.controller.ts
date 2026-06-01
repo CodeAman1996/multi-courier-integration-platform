@@ -20,6 +20,6 @@ export function getCourier(req: Request, res: Response) {
       supported: true,
     });
   } catch (error) {
-    return errorResponse(res, error);
+    return errorResponse(res, error, req);
   }
 }

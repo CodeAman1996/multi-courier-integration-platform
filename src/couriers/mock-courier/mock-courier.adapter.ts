@@ -12,14 +12,26 @@ const MOCK_PARTNER_CODE = 'mock_courier';
 export const mockCourierAdapter: CourierAdapter = {
   partnerCode: MOCK_PARTNER_CODE,
 
+  getCreateShipmentRequestPayload(order: NormalizedOrder) {
+    return {
+      order_id: order.orderId,
+      courier_partner: order.courierPartner,
+      payment_mode: order.paymentMode,
+      declared_value: order.declaredValue,
+      collectable_value: order.collectableValue,
+    };
+  },
+
   async createShipment(order: NormalizedOrder): Promise<CreateShipmentResult> {
     const shipmentId = buildMockShipmentId(order.orderId);
+    const courierRequestPayload = this.getCreateShipmentRequestPayload?.(order);
 
     return {
       courierPartner: MOCK_PARTNER_CODE,
       courierOrderId: shipmentId,
       awbNumber: shipmentId.replace('SHIP', 'AWB'),
       status: 'CREATED',
+      courierRequestPayload,
       rawResponse: {
         shipment_id: shipmentId,
         awb_number: shipmentId.replace('SHIP', 'AWB'),

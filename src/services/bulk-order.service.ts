@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { UnknownCourierError } from '../couriers/courier-registry.js';
+import { logFailure } from '../helpers/error-log.helper.js';
 import type { BulkCreateOrdersRequest } from '../helpers/validation.helper.js';
 import { enqueueBulkOrderJob, type BulkOrderJobData } from '../queues/bulk-order.queue.js';
 import { redis } from '../redis/client.js';
@@ -116,7 +117,7 @@ export class BulkOrderService {
     private readonly orderCreator: OrderService,
   ) {}
 
-  async enqueueBulkCreate(payload: BulkCreateOrdersRequest) {
+  async enqueueBulkCreate(payload: BulkCreateOrdersRequest, options: { requestId?: string } = {}) {
     const now = new Date().toISOString();
     const batch: BulkOrderBatch = {
       batch_id: randomUUID(),
@@ -135,6 +136,7 @@ export class BulkOrderService {
     const jobData = {
       batchId: batch.batch_id,
       orders: payload.orders,
+      requestId: options.requestId,
     };
 
     if (process.env.NODE_ENV === 'test') {
@@ -183,7 +185,9 @@ export class BulkOrderService {
         seenOrderIds.add(orderPayload.order_id);
 
         try {
-          const order = await this.orderCreator.createOrder(orderPayload);
+          const order = await this.orderCreator.createOrder(orderPayload, {
+            requestId: jobData.requestId,
+          });
 
           return {
             order_id: order.order_id,
@@ -196,6 +200,12 @@ export class BulkOrderService {
             },
           } satisfies BulkOrderSuccessResult;
         } catch (error) {
+          logFailure('Bulk order item failed', error, {
+            orderId: orderPayload.order_id,
+            courierPartner: orderPayload.courier_partner,
+            requestId: jobData.requestId,
+          });
+
           return buildBulkFailure(orderPayload.order_id, normalizeBulkError(error));
         }
       }),

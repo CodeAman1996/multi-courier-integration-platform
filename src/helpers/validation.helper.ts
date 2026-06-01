@@ -33,6 +33,8 @@ const envSchema = Joi.object({
   URBANEBOLT_USERNAME: Joi.string().allow('').optional(),
   URBANEBOLT_PASSWORD: Joi.string().allow('').optional(),
   URBANEBOLT_CUSTOMER_CODE: Joi.string().allow('').optional(),
+  COURIER_RETRY_ATTEMPTS: Joi.number().integer().min(0).default(2),
+  COURIER_RETRY_DELAY_MS: Joi.number().integer().min(0).default(250),
 }).unknown(true);
 
 const courierPartnerParamSchema = Joi.object({
@@ -99,6 +101,8 @@ export function validateEnv(source: NodeJS.ProcessEnv) {
     URBANEBOLT_USERNAME?: string;
     URBANEBOLT_PASSWORD?: string;
     URBANEBOLT_CUSTOMER_CODE?: string;
+    COURIER_RETRY_ATTEMPTS: number;
+    COURIER_RETRY_DELAY_MS: number;
   };
 }
 
