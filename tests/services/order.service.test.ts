@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { courierRegistry } from '../../src/couriers/courier-registry.instance.js';
+import { CourierApiError } from '../../src/couriers/urbanebolt/urbanebolt.error-mapper.js';
 import {
   DuplicateOrderError,
   OrderNotFoundError,
@@ -10,6 +12,28 @@ import { trackingHistoryRepository } from '../../src/repositories/tracking-histo
 import { bulkOrderService, bulkOrderStatusStore } from '../../src/services/bulk-order.service.js';
 
 describe('OrderService', () => {
+  beforeAll(() => {
+    courierRegistry.register({
+      partnerCode: 'failing_courier',
+      getCreateShipmentRequestPayload: (order) => ({
+        external_order_id: order.orderId,
+      }),
+      createShipment: async () => {
+        throw new CourierApiError('COURIER_UNAVAILABLE', 'Courier service is temporarily unavailable', 503);
+      },
+      trackShipment: async () => {
+        throw new Error('not implemented');
+      },
+      cancelShipment: async () => {
+        throw new Error('not implemented');
+      },
+    });
+  });
+
+  afterAll(() => {
+    courierRegistry.unregister('failing_courier');
+  });
+
   beforeEach(() => {
     orderRepository.clear();
     trackingHistoryRepository.clear();
@@ -30,6 +54,33 @@ describe('OrderService', () => {
       awb_number: 'MOCK-AWB-ORD1001',
       status: 'CREATED',
       payment_mode: 'PREPAID',
+    });
+
+    const storedOrder = await orderRepository.findByOrderId('ORD-1001');
+    expect(storedOrder?.courier_request_payload).toMatchObject({
+      order_id: 'ORD-1001',
+      courier_partner: 'mock_courier',
+      payment_mode: 'PREPAID',
+    });
+  });
+
+  it('stores failed courier shipment attempts for reconciliation', async () => {
+    await expect(
+      orderService.createOrder({
+        order_id: 'ORD-FAILED-1001',
+        courier_partner: 'failing_courier',
+      }),
+    ).rejects.toBeInstanceOf(CourierApiError);
+
+    const storedOrder = await orderRepository.findByOrderId('ORD-FAILED-1001');
+    expect(storedOrder).toMatchObject({
+      order_id: 'ORD-FAILED-1001',
+      courier_partner: 'failing_courier',
+      status: 'FAILED',
+      courier_request_payload: {
+        external_order_id: 'ORD-FAILED-1001',
+      },
+      failure_reason: 'COURIER_UNAVAILABLE: Courier service is temporarily unavailable',
     });
   });
 
